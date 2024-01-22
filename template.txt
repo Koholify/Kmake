@@ -1,0 +1,7 @@
+CC=clang
+SRC=./src
+
+ProjectName=app
+Flags=-std=c17 -Werror -Wall -pedantic
+Includes=
+

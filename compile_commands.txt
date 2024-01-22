@@ -1,0 +1,6 @@
+-x c
+-std=c17
+-Werror
+-Wall
+-pedantic
+

@@ -1,24 +1,26 @@
 CC:=clang
 srcdir:=./src
-builddir:=.build
+builddir:=./.build
 objdir:=obj
+target:=kmake.exe
 
 srcfiles:=$(wildcard $(srcdir)/*.c)
 objfiles:=$(patsubst $(srcdir)/%.c,$(builddir)/$(objdir)/%.c.o, $(srcfiles))
 
 INC_dirs:=$(addprefix -I,$(srcdir))
-CFlags:=-std=c17 -Werror -Wall -pedantic $(INC_dirs)
+CFlags:=-std=c17 -g -O0 -Werror -Wall -pedantic $(INC_dirs)
 LDFlags:=
 
-all: app.exe
+all: $(target)
 
 .PHONY: run clean dir
 
 run:
-	./app.exe run temp
+	./$(target)
 
 clean:
 	del $(builddir)\$(objdir)\*.o
+	del $(target)
 
 dir:
 	mkdir $(builddir)\$(objdir)
@@ -26,5 +28,5 @@ dir:
 $(builddir)/$(objdir)/%.c.o: $(srcdir)/%.c Makefile
 	$(CC) $(CFlags) -c $< -o $@
 
-app.exe: Makefile $(objfiles)
+$(target): Makefile $(objfiles)
 	$(CC) $(objfiles) -o $@ $(LDFlags)
