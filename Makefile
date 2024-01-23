@@ -2,7 +2,7 @@ CC:=clang
 srcdir:=./src
 builddir:=./.build
 objdir:=obj
-target:=kmake.exe
+target:=kmake
 
 srcfiles:=$(wildcard $(srcdir)/*.c)
 objfiles:=$(patsubst $(srcdir)/%.c,$(builddir)/$(objdir)/%.c.o, $(srcfiles))
