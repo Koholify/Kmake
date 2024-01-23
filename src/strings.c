@@ -26,6 +26,30 @@ int str_len(const char* s) {
 	return len;
 }
 
+int str_starts_with(const char* str, const char* a) {
+	int a_len = str_len(a);
+	if (a_len > str_len(str)) return 0;
+
+	for (int i = 0; i < a_len; i++) {
+		if (str[i] != a[i]) return 0;
+	}
+
+	return 1;
+}
+
+int str_ends_with(const char* str, const char* a) {
+	int len = str_len(str);
+	int a_len = str_len(a);
+	if (a_len > len) return 0;
+
+	int j = 0;
+	for (int i = len - a_len; i < len; i++) {
+		if (str[i] != a[j++]) return 0;
+	}
+
+	return 1;
+}
+
 char * str_cat(const char* a, const char* b) {
 	int la = a ? str_len(a) : 0;
 	int lb = b ? str_len(b) : 0;
@@ -58,6 +82,16 @@ char * str_acopy(const char* src) {
 	char* str = (char*)malloc(sizeof(char) * (len + 1));
 	str_copy(src, str, len);
 	return str;
+}
+
+void str_array_free(str_array *array) {
+	for (int i = 0; i < array->length; i++) {
+		free(array->array[i]);
+	}
+
+	free(array->array);
+	array->array = 0;
+	array->length = 0;
 }
 
 static int increase_array_size(char*** array, int current_size) {

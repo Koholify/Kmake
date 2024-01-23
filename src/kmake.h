@@ -13,8 +13,8 @@ struct Config {
 	const char * includes;
 };
 
-void run_arg(int argc, char** argv);
-void do_make(void);
+void run_with_args(int argc, char** argv);
+void make(void);
 
 void init_dir(void);
 void clean_dir(void);

@@ -1,15 +1,15 @@
 #include <stdio.h>
-#include "args.h"
 #include "kmake.h"
-
+#include "args.h"
+#include "strings.h"
 
 int main(int argc, char** argv) {
 	const char* progname = getarg(argc, argv);
 	printf("Running: %s\n", progname);
 
 	if (shiftargs(&argc, &argv)) {
-		runarg(argc, argv);
+		run_with_args(argc, argv);
 	} else{
-		doMake();
+		make();
 	}
 }

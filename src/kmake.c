@@ -6,7 +6,7 @@
 #include "strings.h"
 #include "args.h"
 
-#ifdef __WIN32__
+#if defined(__WIN32__) || defined(WIN32) || defined(_WIN32) || defined(__NT__)
 #include <windows.h>
 #else
 #include <dirent.h>
@@ -22,7 +22,7 @@ static void print_err_msg(void) {
 			"\tcmd\n");
 }
 
-void runarg(int argc, char** argv) {
+void run_with_args(int argc, char** argv) {
 	const char* arg = getarg(argc, argv);
 	if (!arg) {
 		return;
@@ -41,15 +41,28 @@ void runarg(int argc, char** argv) {
 	}
 }
 
-void doMake(void) {
+void make(void) {
 	struct Config config = get_config();
 	printf("Config:\n\tNAME: %s\n\tCC: %s\n\tSRC: %s\n\tBUILD: %s\n\tCFLAGS: %s\n\tLFLAGS: %s\n\tINCLUDES: %s\n", 
 			config.name, config.cc, config.d_src, config.d_build, config.cflags, config.lflags, config.includes);
 
 	str_array source_files = get_source_files(config.d_src);
-	str_array object_files = get_object_files(config.d_build);
+	for(int i = 0; i < source_files.length; i++) {
+		printf("%s\n", source_files.array[i]);
+	}
+
+	char obj_path[256];
+	sprintf(obj_path, "%s/obj", config.d_build);
+	str_array object_files = get_object_files(obj_path);
+	for(int i = 0; i < object_files.length; i++) {
+		printf("%s\n", object_files.array[i]);
+	}
 
 	free_config(config);
+	str_array_free(&source_files);
+	str_array_free(&object_files);
+
+	system("ls");
 }
 
 void init_dir(void) {
@@ -85,7 +98,7 @@ struct Config get_config(void) {
 	struct Config config = {0};
 	FillConfig(&config, &lines);
 	
-	free(lines.array);
+	str_array_free(&lines);
 	return config;
 }
 
@@ -121,5 +134,91 @@ static void FillConfig(struct Config* config, struct str_array* lines) {
 			if (str_eql(split.array[0], "BUILD"))
 				config->d_build = str_acopy(split.array[1]);
 		}
+
+		str_array_free(&split);
 	}
 }
+
+#if defined(__WIN32__) || defined(WIN32) || defined(_WIN32) || defined(__NT__)
+static str_array get_files_windows(const char* dir_path) {
+}
+#endif
+
+#if defined(__APPLE__) || defined(__linux__)
+static str_array get_files_posix(const char* dir_path) {
+	DIR* dir = opendir(dir_path);
+	struct dirent* dir_info;
+	dir_info = readdir(dir);
+	int filecount = 0;
+	for (; dir_info; dir_info = readdir(dir)){
+		if (dir_info->d_type == DT_REG)
+			filecount++;
+	}
+	closedir(dir);
+
+	str_array array = {0};
+	array.length = filecount;
+	array.array = (char**)malloc(sizeof(void*) * array.length);
+
+	dir = opendir(dir_path);
+	dir_info = readdir(dir);
+	for (int i = 0; dir_info; dir_info = readdir(dir)){
+		if (dir_info->d_type == DT_REG)
+			array.array[i++] = str_acopy(dir_info->d_name);
+	}
+
+	closedir(dir);
+	return array;
+}
+#endif
+
+static str_array get_files(const char* dir) {
+#if defined(__WIN32__) || defined (WIN32)
+	return get_files_windows(dir);
+#else 
+	return get_files_posix(dir);
+#endif
+}
+
+str_array get_source_files(const char* dir) {
+	str_array files = get_files(dir);
+
+	int count = 0;
+	for (int i = 0; i < files.length; i++) {
+		if (str_ends_with(files.array[i], ".c"))
+			count++;
+	}
+
+	str_array array = {0};
+	array.length = count;
+	array.array = (char**)malloc(sizeof(void*) * array.length);
+	for (int i = 0, j = 0; i < files.length; i++) {
+		if (str_ends_with(files.array[i], ".c"))
+			array.array[j++] = str_acopy(files.array[i]);
+	}
+
+	str_array_free(&files);
+	return array;
+}
+
+str_array get_object_files(const char* dir) {
+	str_array files = get_files(dir);
+
+	int count = 0;
+	for (int i = 0; i < files.length; i++) {
+		if (str_ends_with(files.array[i], ".o"))
+			count++;
+	}
+
+	str_array array = {0};
+	array.length = count;
+	array.array = (char**)malloc(sizeof(void*) * array.length);
+	for (int i = 0, j = 0; i < files.length; i++) {
+		if (str_ends_with(files.array[i], ".o"))
+			array.array[j++] = str_acopy(files.array[i]);
+	}
+
+	str_array_free(&files);
+	return array;
+}
+

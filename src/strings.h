@@ -7,18 +7,21 @@ struct str_stream {
 	struct str_stream* next;
 	struct str_stream* end;
 };
-
 typedef struct str_stream str_stream;
 
 struct str_array {
 	char ** array;
 	int length;
 };
-
 typedef struct str_array str_array;
 
 int str_eql(const char* a, const char* b);
 int str_len(const char* s);
+
+// return 1 if start of str matches a, else 0
+int str_starts_with(const char* str, const char* a);
+// return 1 if end of str matches a, else 0
+int str_ends_with(const char* str, const char* a);
 
 // allocate copy of string a+b on the heap
 char * str_cat(const char* a, const char* b);
@@ -29,6 +32,8 @@ char * str_acopy(const char* src);
 // Split a string into an array of strings.
 struct str_array str_split(const char* src, const char* sep);
 struct str_array str_splitN(const char* src, const char* sep, int n);
+
+void str_array_free(str_array* array);
 
 // Create root node of str_stream
 struct str_stream* str_stream_init(void);
