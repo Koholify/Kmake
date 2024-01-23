@@ -6,6 +6,12 @@
 #include "strings.h"
 #include "args.h"
 
+#ifdef __WIN32__
+#include <windows.h>
+#else
+#include <dirent.h>
+#endif
+
 static void print_err_msg(void) {
 		printf("No proper agrument.\n"
 			"Try: kmake <command:optional>\n"
@@ -36,9 +42,14 @@ void runarg(int argc, char** argv) {
 }
 
 void doMake(void) {
-	struct Config config = get_conf();
+	struct Config config = get_config();
 	printf("Config:\n\tNAME: %s\n\tCC: %s\n\tSRC: %s\n\tBUILD: %s\n\tCFLAGS: %s\n\tLFLAGS: %s\n\tINCLUDES: %s\n", 
 			config.name, config.cc, config.d_src, config.d_build, config.cflags, config.lflags, config.includes);
+
+	str_array source_files = get_source_files(config.d_src);
+	str_array object_files = get_object_files(config.d_build);
+
+	free_config(config);
 }
 
 void init_dir(void) {
@@ -54,7 +65,7 @@ void get_compile_commands(void) {
 }
 
 static void FillConfig(struct Config* config, struct str_array* lines);
-struct Config get_conf(void) {
+struct Config get_config(void) {
 	FILE* file = fopen("KMakeFile.txt", "r");
 	str_stream* ss = str_stream_init();
 
@@ -78,7 +89,7 @@ struct Config get_conf(void) {
 	return config;
 }
 
-void free_conf(struct Config config) {
+void free_config(struct Config config) {
 	free((void*)config.name);
 	free((void*)config.d_src);
 	free((void*)config.d_build);

@@ -1,6 +1,8 @@
 #ifndef _H_KMAKE
 #define _H_KMAKE
 
+#include "strings.h"
+
 struct Config {
 	const char * name;
 	const char * d_src;
@@ -11,16 +13,18 @@ struct Config {
 	const char * includes;
 };
 
-void runarg(int argc, char** argv);
-void doMake(void);
+void run_arg(int argc, char** argv);
+void do_make(void);
 
 void init_dir(void);
 void clean_dir(void);
 void run_exe(void);
 void get_compile_commands(void);
 
-struct Config get_conf(void);
-void free_conf(struct Config config);
+struct Config get_config(void);
+void free_config(struct Config config);
 
+str_array get_source_files(const char* dir);
+str_array get_object_files(const char* dir);
 
 #endif // !_H_KMAKE
