@@ -36,7 +36,9 @@ void runarg(int argc, char** argv) {
 }
 
 void doMake(void) {
-	get_conf();
+	struct Config config = get_conf();
+	printf("Config:\n\tNAME: %s\n\tCC: %s\n\tSRC: %s\n\tBUILD: %s\n\tCFLAGS: %s\n\tLFLAGS: %s\n\tINCLUDES: %s\n", 
+			config.name, config.cc, config.d_src, config.d_build, config.cflags, config.lflags, config.includes);
 }
 
 void init_dir(void) {
@@ -51,28 +53,62 @@ void run_exe(void) {
 void get_compile_commands(void) {
 }
 
+static void FillConfig(struct Config* config, struct str_array* lines);
 struct Config get_conf(void) {
 	FILE* file = fopen("KMakeFile.txt", "r");
-	char * contents = 0;
-	printf("Got file\n");
+	str_stream* ss = str_stream_init();
 
 	char buffer[256] = {0};
 	while(fgets(buffer, 256, file))
 	{
-		printf("reading: %s", buffer);
-		char* tmp = str_cat(contents, buffer);
-		free(contents);
-		contents = tmp;
+		str_stream_add(ss, buffer);
 	}
-
-	printf("Close file\n");
 	fclose(file);
 
-	printf("Result:\n%s...\n", contents);
+	char* contents = str_stream_merge(ss);
+	str_stream_free(ss);
 
 	struct str_array lines = str_split(contents, "\n");
+	free(contents);
 
+	struct Config config = {0};
+	FillConfig(&config, &lines);
 	
 	free(lines.array);
-	return (struct Config){0};
+	return config;
+}
+
+void free_conf(struct Config config) {
+	free((void*)config.name);
+	free((void*)config.d_src);
+	free((void*)config.d_build);
+	free((void*)config.cc);
+	free((void*)config.cflags);
+	free((void*)config.lflags);
+	free((void*)config.includes);
+}
+
+static void FillConfig(struct Config* config, struct str_array* lines) {
+	char** array = lines->array;
+	int length = lines->length;
+	for (int i = 0; i < length; i++) {
+		str_array split = str_splitN(array[i], "=", 1);
+		if (split.length == 2)
+		{
+			if (str_eql(split.array[0], "PROJECTNAME"))
+				config->name = str_acopy(split.array[1]);
+			if (str_eql(split.array[0], "CFLAGS"))
+				config->cflags = str_acopy(split.array[1]);
+			if (str_eql(split.array[0], "LFLAGS"))
+				config->lflags = str_acopy(split.array[1]);
+			if (str_eql(split.array[0], "INCLUDES"))
+				config->includes = str_acopy(split.array[1]);
+			if (str_eql(split.array[0], "SRC"))
+				config->d_src = str_acopy(split.array[1]);
+			if (str_eql(split.array[0], "CC"))
+				config->cc = str_acopy(split.array[1]);
+			if (str_eql(split.array[0], "BUILD"))
+				config->d_build = str_acopy(split.array[1]);
+		}
+	}
 }

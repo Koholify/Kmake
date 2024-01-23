@@ -3,6 +3,9 @@ srcdir:=./src
 builddir:=./.build
 objdir:=obj
 target:=kmake
+ifeq ($(OS), WINDOWS_NT)
+	target:=kmake.exe
+endif
 
 srcfiles:=$(wildcard $(srcdir)/*.c)
 objfiles:=$(patsubst $(srcdir)/%.c,$(builddir)/$(objdir)/%.c.o, $(srcfiles))
@@ -13,17 +16,22 @@ LDFlags:=
 
 all: $(target)
 
-.PHONY: run clean dir
+.PHONY: run cleanW clean dirW dir
 
 run:
 	./$(target)
 
-clean:
+cleanW:
 	del $(builddir)\$(objdir)\*.o
 	del $(target)
+clean:
+	rm $(builddir)/$(objdir)/*.o
+	rm $(target)
 
-dir:
+dirW:
 	mkdir $(builddir)\$(objdir)
+dir:
+	mkdir $(builddir)/$(objdir)
 
 $(builddir)/$(objdir)/%.c.o: $(srcdir)/%.c Makefile
 	$(CC) $(CFlags) -c $< -o $@

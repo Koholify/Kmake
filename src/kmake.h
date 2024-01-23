@@ -6,7 +6,8 @@ struct Config {
 	const char * d_src;
 	const char * d_build;
 	const char * cc;
-	const char * flags;
+	const char * cflags;
+	const char * lflags;
 	const char * includes;
 };
 
@@ -19,6 +20,7 @@ void run_exe(void);
 void get_compile_commands(void);
 
 struct Config get_conf(void);
+void free_conf(struct Config config);
 
 
 #endif // !_H_KMAKE
