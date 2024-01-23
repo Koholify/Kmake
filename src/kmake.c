@@ -69,6 +69,10 @@ struct Config get_conf(void) {
 	fclose(file);
 
 	printf("Result:\n%s...\n", contents);
+
+	struct str_array lines = str_split(contents, "\n");
+
 	
+	free(lines.array);
 	return (struct Config){0};
 }
