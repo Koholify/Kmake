@@ -1,3 +1,4 @@
+#include <assert.h>
 #define _CRT_SECURE_NO_WARNINGS 1
 
 #include <stdio.h>
@@ -7,8 +8,10 @@
 #include "args.h"
 
 #if defined(__WIN32__) || defined(WIN32) || defined(_WIN32) || defined(__NT__)
+#define WINDOWS_VER 1
 #include <windows.h>
 #else
+#define __USE_MISC 1
 #include <dirent.h>
 #endif
 
@@ -21,6 +24,17 @@ static void print_err_msg(void) {
 			"\trun\n"
 			"\tcmd\n");
 }
+
+const char* template = "\
+CC=clang\n\
+SRC=./src/\n\
+BUILD=./.build/\n\
+\n\
+PROJECTNAME=app\n\
+CFLAGS=-std=c17 -Werror -Wall -pedantic\n\
+LFLAGS=\n\
+INCLUDES=\n\
+";
 
 void run_with_args(int argc, char** argv) {
 	const char* arg = getarg(argc, argv);
@@ -52,17 +66,46 @@ void make(void) {
 	}
 
 	char obj_path[256];
-	sprintf(obj_path, "%s/obj", config.d_build);
-	str_array object_files = get_object_files(obj_path);
-	for(int i = 0; i < object_files.length; i++) {
-		printf("%s\n", object_files.array[i]);
+	snprintf(obj_path, 256, "%sobj/", config.d_build);
+
+	char cmd[1028] = {0};
+	char outfile[512] = {0};
+	for(int i = 0; i < source_files.length; i++) {
+		snprintf(outfile, 512, "%s%s.o", obj_path, source_files.array[i]);
+		snprintf(cmd, 1028, "%s %s -c %s%s -o %s", config.cc, config.cflags, config.d_src, source_files.array[i], outfile);
+		printf("%s\n", cmd);
+		int r = system(cmd);
+		if (r) assert(0 && "File failed to compile!!");
 	}
 
+	str_stream* ss = str_stream_init();
+	str_array object_files = get_object_files(obj_path);
+	for(int i = 0; i < object_files.length; i++) {
+		snprintf(outfile, 512, "%s%s", obj_path, object_files.array[i]);
+		str_stream_add(ss, outfile);
+		str_stream_add(ss, " ");
+	}
+
+	const char* obj_files = str_stream_merge(ss);
+	str_stream_free(ss);
+
+	char* target = str_acopy(config.name);
+#if WINDOWS_VER
+	char* ntarget = str_cat(target, ".exe");
+	free(target);
+	target = ntarget;
+#endif
+	
+	snprintf(cmd, 1028, "%s %s-o %s %s", config.cc, obj_files, config.name, config.lflags);
+	printf("%s\n", cmd);
+	int r = system(cmd);
+	if (r) assert(0 && "Executable failed to link!!");
+
+	free(target);
+	free((void*)obj_files);
 	free_config(config);
 	str_array_free(&source_files);
 	str_array_free(&object_files);
-
-	system("ls");
 }
 
 void init_dir(void) {
@@ -135,11 +178,23 @@ static void FillConfig(struct Config* config, struct str_array* lines) {
 				config->d_build = str_acopy(split.array[1]);
 		}
 
+		if (!(str_ends_with(config->d_build, "/") || str_ends_with(config->d_build, "\\"))) {
+			const char* old = config->d_build;
+			config->d_build = str_cat(old, "/");
+			free((void*)old);
+		}
+
+		if (!(str_ends_with(config->d_src, "/") || str_ends_with(config->d_src, "\\"))) {
+			const char* old = config->d_src;
+			config->d_src = str_cat(old, "/");
+			free((void*)old);
+		}
+
 		str_array_free(&split);
 	}
 }
 
-#if defined(__WIN32__) || defined(WIN32) || defined(_WIN32) || defined(__NT__)
+#if WINDOWS_VER
 static str_array get_files_windows(const char* dir_path) {
 }
 #endif
@@ -173,7 +228,7 @@ static str_array get_files_posix(const char* dir_path) {
 #endif
 
 static str_array get_files(const char* dir) {
-#if defined(__WIN32__) || defined (WIN32)
+#if WINDOWS_VER
 	return get_files_windows(dir);
 #else 
 	return get_files_posix(dir);

@@ -53,17 +53,13 @@ int str_ends_with(const char* str, const char* a) {
 char * str_cat(const char* a, const char* b) {
 	int la = a ? str_len(a) : 0;
 	int lb = b ? str_len(b) : 0;
-	printf("la: %d, lb: %d\n", la, lb);
 	char* m = (char*)malloc(la + lb + 1);
 	if (!m) {
 		return NULL;
 	}
 
-	printf("add: %p, m: %s\n", (void*)m, m);
 	str_copy(a, m, la);
-	printf("add: %p, m: %s\n", (void*)(m + la + 1), m);
 	str_copy(b, m + la, lb);
-	printf("m: %s\n", m);
 
 	return m;
 }
@@ -157,6 +153,8 @@ struct str_stream* str_stream_init(void) {
 	str_stream* stream = (str_stream*)malloc(sizeof(str_stream));
 	stream->end = stream;
 	stream->length = 0;
+	stream->str = 0;
+	stream->next = 0;
 	return stream;
 }
 
