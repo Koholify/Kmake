@@ -21,6 +21,17 @@
 #include <unistd.h>
 #endif
 
+
+struct cmd_ptrs {
+	const char* file;
+	const char* obj_path;
+	// string to be filled.
+	char* out;
+	// max length of out.
+	int n;
+};
+
+typedef struct cmd_ptrs cmd_ptrs;
 const char* helloworldTemplate = "\
 #include <stdio.h>\n\
 \n\
@@ -39,6 +50,7 @@ LFLAGS=\n\
 INCLUDES=\n\
 \n\
 INSTALL_LOC=/usr/bin/\n\
+COMPILE_COMMANDS=0\n\
 ";
 
 const char* gitignoreTemplate = "\
@@ -68,7 +80,7 @@ static const char* get_cwd(void)
 #else
 	char path[PATH_MAX];
 	getcwd(path, PATH_MAX);
-	if (str_ends_with(path, "/") || str_ends_with(path, "\\")) {
+	if (str_ends_with(path, "/") || str_ends_with(path, "\\")){
 		cwd = str_acopy(path);
 	} else {
 		cwd = str_cat(path, "/");
@@ -97,6 +109,12 @@ static void print_err_msg(void) {
 			"\trun\n"
 			"\tinstall\n"
 			"\tcmd\n");
+}
+
+static void create_compile_command(struct Config* config, cmd_ptrs* ptrs) {
+	char outfile[PATH_MAX];
+	snprintf(outfile, PATH_MAX, "%s%s.o", ptrs->obj_path, ptrs->file);
+	snprintf(ptrs->out, ptrs->n, "%s %s %s -I%s -c %s%s -o %s", config->cc, config->cflags, config->includes, config->d_src, config->d_src, ptrs->file, outfile);
 }
 
 void run_with_args(int argc, char** argv) {
@@ -136,17 +154,14 @@ void make(void) {
 	}
 
 	str_array source_files = get_source_files(config.d_src);
-	for(int i = 0; i < source_files.length; i++) {
-	}
-
 	char obj_path[PATH_MAX];
 	snprintf(obj_path, PATH_MAX, "%sobj/", config.d_build);
 
 	char cmd[PATH_MAX] = {0};
-	char outfile[PATH_MAX] = {0};
+	cmd_ptrs ptrs = {.n = PATH_MAX, .file = 0, .obj_path = obj_path, .out = cmd};
 	for(int i = 0; i < source_files.length; i++) {
-		snprintf(outfile, PATH_MAX, "%s%s.o", obj_path, source_files.array[i]);
-		snprintf(cmd, PATH_MAX, "%s %s -c %s%s -o %s", config.cc, config.cflags, config.d_src, source_files.array[i], outfile);
+		ptrs.file = source_files.array[i];
+		create_compile_command(&config, &ptrs);
 		printf("%s\n", cmd);
 		int r = system(cmd);
 		if (r) err(1, "File %s failed to compile!!\n", source_files.array[i]);
@@ -154,9 +169,10 @@ void make(void) {
 
 	str_stream* ss = str_stream_init();
 	str_array object_files = get_object_files(obj_path);
+	char outfiles[PATH_MAX];
 	for(int i = 0; i < object_files.length; i++) {
-		snprintf(outfile, PATH_MAX, "%s%s", obj_path, object_files.array[i]);
-		str_stream_add(ss, outfile);
+		snprintf(outfiles, PATH_MAX, "%s%s", obj_path, object_files.array[i]);
+		str_stream_add(ss, outfiles);
 		str_stream_add(ss, " ");
 	}
 
@@ -171,9 +187,14 @@ void make(void) {
 
 	free((void*)target);
 	free((void*)obj_files);
-	free_config(config);
 	str_array_free(&source_files);
 	str_array_free(&object_files);
+
+	if (config.compile_command) {
+		get_compile_commands(&config);
+	}
+
+	free_config(config);
 }
 
 void init_dir(void) {
@@ -185,8 +206,8 @@ void init_dir(void) {
 	else if (mkdir("./.build/obj/", 0777))
 		printf("Unable to make \".build/obj\" directory. errno: %d\n", errno);
 
-	printf("Creating config file:\n%s\n", makeTemplate);
 	const char* cwd = get_cwd();
+	printf("Creating config file:\nDIR=%s\n%s\n", cwd, makeTemplate);
 	FILE* conf = fopen("KMakeFile.txt", "w");
 	fputs("DIR=", conf);
 	fputs(cwd, conf);
@@ -244,17 +265,38 @@ void get_compile_commands(struct Config* config) {
 	const char* end = "]\n";
 	const char* commandTemplate = "\
 {\n\
-  \"directory\": \"/Users/miko/projects/testDir\",\n\
-  \"command\": \"/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/cc    -arch arm64 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX14.0.sdk -o CMakeFiles/APP.dir/src/main.c.o -c /Users/miko/projects/testDir/src/main.c\",\n\
-  \"file\": \"/Users/miko/projects/testDir/src/main.c\",\n\
-  \"output\": \"CMakeFiles/APP.dir/src/main.c.o\"\n\
-},\n";
+  \"directory\": \"%s\",\n\
+  \"command\": \"%s\",\n\
+  \"file\": \"%s\",\n\
+  \"output\": \"%s%s.o\"\n\
+}";
+
+	str_array source_files = get_source_files(config->d_src);
+	char cmd[1024];
+	char obj_path[PATH_MAX]; 
+	snprintf(obj_path, PATH_MAX, "%sobj/", config->d_build);
 
 	fputs(start, file);
-	fputs(commandTemplate, file);
+
+	for (int i = 0; i < source_files.length; i++) {
+		cmd_ptrs ptrs = {.out = cmd, .obj_path = obj_path, .file = source_files.array[i], .n = 1024};
+		create_compile_command(config, &ptrs);
+	
+		char filledTemplate[4096];
+		snprintf(filledTemplate, 4096, commandTemplate, config->d_parent, cmd, source_files.array[i], obj_path, source_files.array[i]);
+		fputs(filledTemplate, file);
+
+		if (i == source_files.length  - 1) {
+			fputs("\n", file);
+		} else {
+			fputs(",\n", file);
+		}
+	}
 	fputs(end, file);
 
 	fclose(file);
+
+	str_array_free(&source_files);
 }
 
 void install(struct Config* config) {
@@ -333,6 +375,8 @@ static void FillConfig(struct Config* config, struct str_array* lines) {
 				config->d_install = str_acopy(split.array[1]);
 			if (str_eql(split.array[0], "DIR"))
 				config->d_parent = str_acopy(split.array[1]);
+			if (str_eql(split.array[0], "COMPILE_COMMANDS"))
+				config->compile_command = str_eql(split.array[1], "1");
 		}
 
 		if (!(str_ends_with(config->d_build, "/") || str_ends_with(config->d_build, "\\"))) {

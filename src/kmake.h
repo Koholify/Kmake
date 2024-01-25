@@ -13,6 +13,7 @@ struct Config {
 	const char * includes;
 	const char * d_install;
 	const char * d_parent;
+	char compile_command;
 };
 
 void run_with_args(int argc, char** argv);
