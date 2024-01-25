@@ -3,6 +3,8 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <err.h>
+#include <limits.h>
 #include "kmake.h"
 #include "strings.h"
 #include "args.h"
@@ -11,21 +13,22 @@
 #define WINDOWS_VER 1
 #include <windows.h>
 #else
+#define POSIX_VER 1
 #define __USE_MISC 1
 #include <dirent.h>
+#include <sys/stat.h>
+#include <errno.h>
+#include <unistd.h>
 #endif
 
-static void print_err_msg(void) {
-		printf("No proper agrument.\n"
-			"Try: kmake <command:optional>\n"
-			"commands:\n"
-			"\tinit\n"
-			"\tclean\n"
-			"\trun\n"
-			"\tcmd\n");
-}
+const char* helloworldTemplate = "\
+#include <stdio.h>\n\
+\n\
+int main(int argc, char** argv) {\n\
+	printf(\"Hello World!\\n\");\n\
+}\n";
 
-const char* template = "\
+const char* makeTemplate = "\
 CC=clang\n\
 SRC=./src/\n\
 BUILD=./.build/\n\
@@ -34,7 +37,67 @@ PROJECTNAME=app\n\
 CFLAGS=-std=c17 -Werror -Wall -pedantic\n\
 LFLAGS=\n\
 INCLUDES=\n\
+\n\
+INSTALL_LOC=/usr/bin/\n\
 ";
+
+const char* gitignoreTemplate = "\
+.build\n\
+.vs\n\
+.vscode\n\
+";
+
+#if WINDOWS_VER
+static str_array get_files_windows(const char* dir_path);
+#else 
+static str_array get_files_posix(const char* dir_path);
+#endif
+
+static str_array get_files(const char* dir) {
+#if WINDOWS_VER
+	return get_files_windows(dir);
+#else 
+	return get_files_posix(dir);
+#endif
+}
+
+static const char* get_cwd(void)
+{
+	char* cwd = 0;
+#if WINDOWS_VER
+#else
+	char path[PATH_MAX];
+	getcwd(path, PATH_MAX);
+	if (str_ends_with(path, "/") || str_ends_with(path, "\\")) {
+		cwd = str_acopy(path);
+	} else {
+		cwd = str_cat(path, "/");
+	}
+#endif
+
+	return cwd;
+}
+
+static const char* get_target(struct Config* config) {
+	char target[PATH_MAX];
+	char* extension = "";
+#if WINDOWS_VER
+	extension = ".exe";
+#endif
+	snprintf(target, PATH_MAX, "%s%s%s", config->d_build, config->name, extension);
+	return str_acopy(target);
+}
+
+static void print_err_msg(void) {
+		printf("No proper agrument.\n"
+			"Try: kmake <command:optional>\n"
+			"commands:\n"
+			"\tinit\n"
+			"\tclean\n"
+			"\trun\n"
+			"\tinstall\n"
+			"\tcmd\n");
+}
 
 void run_with_args(int argc, char** argv) {
 	const char* arg = getarg(argc, argv);
@@ -42,46 +105,57 @@ void run_with_args(int argc, char** argv) {
 		return;
 	}
 
+	struct Config config = get_config();
+	if (!str_eql(arg, "init") && (!config.cc || !config.name)) {
+		printf("KMakeFile.txt not found or unable to open\n"); 
+		abort();
+	}
+
 	if (str_eql(arg, "init")) {
 		init_dir();
 	} else if (str_eql(arg, "clean")) {
-		clean_dir();
+		clean_dir(&config);
 	} else if (str_eql(arg, "run")) {
-		run_exe();
+		run_exe(&config);
 	} else if (str_eql(arg, "cmd")) {
-		get_compile_commands();
+		get_compile_commands(&config);
+	} else if (str_eql(arg, "install")) {
+		install(&config);
 	} else {
 		print_err_msg();
 	}
+
+	free_config(config);
 }
 
 void make(void) {
 	struct Config config = get_config();
-	printf("Config:\n\tNAME: %s\n\tCC: %s\n\tSRC: %s\n\tBUILD: %s\n\tCFLAGS: %s\n\tLFLAGS: %s\n\tINCLUDES: %s\n", 
-			config.name, config.cc, config.d_src, config.d_build, config.cflags, config.lflags, config.includes);
+	if (!config.cc || !config.name) {
+		printf("KMakeFile.txt not found or unable to open\n"); 
+		abort();
+	}
 
 	str_array source_files = get_source_files(config.d_src);
 	for(int i = 0; i < source_files.length; i++) {
-		printf("%s\n", source_files.array[i]);
 	}
 
-	char obj_path[256];
-	snprintf(obj_path, 256, "%sobj/", config.d_build);
+	char obj_path[PATH_MAX];
+	snprintf(obj_path, PATH_MAX, "%sobj/", config.d_build);
 
-	char cmd[1028] = {0};
-	char outfile[512] = {0};
+	char cmd[PATH_MAX] = {0};
+	char outfile[PATH_MAX] = {0};
 	for(int i = 0; i < source_files.length; i++) {
-		snprintf(outfile, 512, "%s%s.o", obj_path, source_files.array[i]);
-		snprintf(cmd, 1028, "%s %s -c %s%s -o %s", config.cc, config.cflags, config.d_src, source_files.array[i], outfile);
+		snprintf(outfile, PATH_MAX, "%s%s.o", obj_path, source_files.array[i]);
+		snprintf(cmd, PATH_MAX, "%s %s -c %s%s -o %s", config.cc, config.cflags, config.d_src, source_files.array[i], outfile);
 		printf("%s\n", cmd);
 		int r = system(cmd);
-		if (r) assert(0 && "File failed to compile!!");
+		if (r) err(1, "File %s failed to compile!!\n", source_files.array[i]);
 	}
 
 	str_stream* ss = str_stream_init();
 	str_array object_files = get_object_files(obj_path);
 	for(int i = 0; i < object_files.length; i++) {
-		snprintf(outfile, 512, "%s%s", obj_path, object_files.array[i]);
+		snprintf(outfile, PATH_MAX, "%s%s", obj_path, object_files.array[i]);
 		str_stream_add(ss, outfile);
 		str_stream_add(ss, " ");
 	}
@@ -89,19 +163,13 @@ void make(void) {
 	const char* obj_files = str_stream_merge(ss);
 	str_stream_free(ss);
 
-	char* target = str_acopy(config.name);
-#if WINDOWS_VER
-	char* ntarget = str_cat(target, ".exe");
-	free(target);
-	target = ntarget;
-#endif
-	
-	snprintf(cmd, 1028, "%s %s-o %s %s", config.cc, obj_files, config.name, config.lflags);
+	const char* target = get_target(&config);
+	snprintf(cmd, PATH_MAX, "%s %s-o %s %s", config.cc, obj_files, target, config.lflags);
 	printf("%s\n", cmd);
 	int r = system(cmd);
-	if (r) assert(0 && "Executable failed to link!!");
+	if (r) err(1, "Executable failed to link!!\n");
 
-	free(target);
+	free((void*)target);
 	free((void*)obj_files);
 	free_config(config);
 	str_array_free(&source_files);
@@ -109,20 +177,103 @@ void make(void) {
 }
 
 void init_dir(void) {
+	printf("Adding source and build directories...\n");
+	if (mkdir("./src", 0777)) 
+		printf("Unable to make \"src/\" directory. errno: %d\n", errno);
+	if (mkdir("./.build", 0777)) 
+		printf("Unable to make \".build/\" directory. errno: %d\n", errno);
+	else if (mkdir("./.build/obj/", 0777))
+		printf("Unable to make \".build/obj\" directory. errno: %d\n", errno);
+
+	printf("Creating config file:\n%s\n", makeTemplate);
+	const char* cwd = get_cwd();
+	FILE* conf = fopen("KMakeFile.txt", "w");
+	fputs("DIR=", conf);
+	fputs(cwd, conf);
+	fputc('\n', conf);
+	fputs(makeTemplate, conf);
+	fclose(conf);
+	free((void*)cwd);
+
+	printf("Creating .gitignore file:\n%s\n", gitignoreTemplate);
+	FILE* ignore = fopen(".gitignore", "w");
+	fputs(gitignoreTemplate, ignore);
+	fclose(ignore);
+
+	FILE* example = fopen("./src/main.c", "w");
+	fputs(helloworldTemplate, example);
+	fclose(example);
 }
 
-void clean_dir(void) {
+void clean_dir(struct Config* config) {
+
+	printf("removing files...\n");
+	const char* target = get_target(config);
+
+	if (remove(target)) err(1, "Failed to remove %s\n", target);
+	free((void*)target);
+	char path[PATH_MAX];
+	snprintf(path, PATH_MAX, "%sobj/", config->d_build);
+
+	str_array objs = get_object_files(path);
+	char file[PATH_MAX];
+	for (int i = 0; i < objs.length; i++) {
+		snprintf(file, PATH_MAX, "%s%s", path, objs.array[i]);
+		if (remove(file)) err(1, "Failed to remove %s\n", file);
+	}
+
+	str_array_free(&objs);
 }
 
-void run_exe(void) {
+void run_exe(struct Config* config) {
+	const char* target = get_target(config);
+
+	printf("%s\n", target);
+	system(target);
+	free((void*)target);
 }
 
-void get_compile_commands(void) {
+void get_compile_commands(struct Config* config) {
+	FILE* file = fopen("compile_commands.json", "w");
+	if (!file) {
+		err(1, "Unable to create compile_commands.json\n");
+		return;
+	}
+
+	const char* start = "[\n";
+	const char* end = "]\n";
+	const char* commandTemplate = "\
+{\n\
+  \"directory\": \"/Users/miko/projects/testDir\",\n\
+  \"command\": \"/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/cc    -arch arm64 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX14.0.sdk -o CMakeFiles/APP.dir/src/main.c.o -c /Users/miko/projects/testDir/src/main.c\",\n\
+  \"file\": \"/Users/miko/projects/testDir/src/main.c\",\n\
+  \"output\": \"CMakeFiles/APP.dir/src/main.c.o\"\n\
+},\n";
+
+	fputs(start, file);
+	fputs(commandTemplate, file);
+	fputs(end, file);
+
+	fclose(file);
+}
+
+void install(struct Config* config) {
+	char cmd[PATH_MAX];
+	const char* target = get_target(config);
+	snprintf(cmd, PATH_MAX, "install -v %s %s", target, config->d_install);
+
+	printf("%s\n", cmd);
+	system(cmd);
+	free((void*)target);
 }
 
 static void FillConfig(struct Config* config, struct str_array* lines);
 struct Config get_config(void) {
 	FILE* file = fopen("KMakeFile.txt", "r");
+	if (!file) {
+		return (struct Config){0};
+	}
+
 	str_stream* ss = str_stream_init();
 
 	char buffer[256] = {0};
@@ -153,6 +304,8 @@ void free_config(struct Config config) {
 	free((void*)config.cflags);
 	free((void*)config.lflags);
 	free((void*)config.includes);
+	free((void*)config.d_install);
+	free((void*)config.d_parent);
 }
 
 static void FillConfig(struct Config* config, struct str_array* lines) {
@@ -176,6 +329,10 @@ static void FillConfig(struct Config* config, struct str_array* lines) {
 				config->cc = str_acopy(split.array[1]);
 			if (str_eql(split.array[0], "BUILD"))
 				config->d_build = str_acopy(split.array[1]);
+			if (str_eql(split.array[0], "INSTALL_LOC"))
+				config->d_install = str_acopy(split.array[1]);
+			if (str_eql(split.array[0], "DIR"))
+				config->d_parent = str_acopy(split.array[1]);
 		}
 
 		if (!(str_ends_with(config->d_build, "/") || str_ends_with(config->d_build, "\\"))) {
@@ -190,6 +347,18 @@ static void FillConfig(struct Config* config, struct str_array* lines) {
 			free((void*)old);
 		}
 
+		if (!(str_ends_with(config->d_parent, "/") || str_ends_with(config->d_parent, "\\"))) {
+			const char* old = config->d_parent;
+			config->d_parent = str_cat(old, "/");
+			free((void*)old);
+		}
+
+		if (!(str_ends_with(config->d_install, "/") || str_ends_with(config->d_install, "\\"))) {
+			const char* old = config->d_install;
+			config->d_install = str_cat(old, "/");
+			free((void*)old);
+		}
+
 		str_array_free(&split);
 	}
 }
@@ -199,7 +368,7 @@ static str_array get_files_windows(const char* dir_path) {
 }
 #endif
 
-#if defined(__APPLE__) || defined(__linux__)
+#if POSIX_VER
 static str_array get_files_posix(const char* dir_path) {
 	DIR* dir = opendir(dir_path);
 	struct dirent* dir_info;
@@ -226,14 +395,6 @@ static str_array get_files_posix(const char* dir_path) {
 	return array;
 }
 #endif
-
-static str_array get_files(const char* dir) {
-#if WINDOWS_VER
-	return get_files_windows(dir);
-#else 
-	return get_files_posix(dir);
-#endif
-}
 
 str_array get_source_files(const char* dir) {
 	str_array files = get_files(dir);

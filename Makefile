@@ -17,10 +17,13 @@ LDFlags:=
 
 all: $(target)
 
-.PHONY: run cleanW clean dirW dir
+.PHONY: run cleanW clean dirW dir install
 
 run:
 	./$(target)
+
+install: $(target)
+	install -v ./$(target) /usr/local/bin
 
 cleanW:
 	del $(builddir)\$(objdir)\*.o
