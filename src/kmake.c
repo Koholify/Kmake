@@ -161,6 +161,12 @@ void make(void) {
 	cmd_ptrs ptrs = {.n = PATH_MAX, .file = 0, .obj_path = obj_path, .out = cmd};
 	for(int i = 0; i < source_files.length; i++) {
 		ptrs.file = source_files.array[i];
+
+		//TODO check modified times
+		struct stat st = {0};
+		if(stat(ptrs.file, &st) == 1) {
+		}
+
 		create_compile_command(&config, &ptrs);
 		printf("%s\n", cmd);
 		int r = system(cmd);
@@ -255,6 +261,7 @@ void run_exe(struct Config* config) {
 }
 
 void get_compile_commands(struct Config* config) {
+	printf("Creating compile_commands.json");
 	FILE* file = fopen("compile_commands.json", "w");
 	if (!file) {
 		err(1, "Unable to create compile_commands.json\n");
