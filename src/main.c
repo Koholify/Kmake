@@ -1,4 +1,3 @@
-#include <stdio.h>
 #include "kmake.h"
 #include "args.h"
 #include "strings.h"

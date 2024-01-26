@@ -1,24 +1,33 @@
-#include <assert.h>
 #define _CRT_SECURE_NO_WARNINGS 1
 
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <err.h>
-#include <limits.h>
 #include "kmake.h"
 #include "strings.h"
 #include "args.h"
 
 #if defined(__WIN32__) || defined(WIN32) || defined(_WIN32) || defined(__NT__)
 #define WINDOWS_VER 1
+
 #include <windows.h>
+
 #else
+
 #define POSIX_VER 1
 #define __USE_MISC 1
+#include <stdint.h>
 #include <dirent.h>
 #include <sys/stat.h>
 #include <errno.h>
+#include <limits.h>
 #include <unistd.h>
+
+#ifdef __linux__
+#include <linux/limits.h>
+#endif
+
 #endif
 
 
@@ -65,7 +74,7 @@ static str_array get_files_windows(const char* dir_path);
 static str_array get_files_posix(const char* dir_path);
 #endif
 
-static str_array get_files(const char* dir) {
+str_array get_files(const char* dir) {
 #if WINDOWS_VER
 	return get_files_windows(dir);
 #else 
@@ -73,7 +82,7 @@ static str_array get_files(const char* dir) {
 #endif
 }
 
-static const char* get_cwd(void)
+const char* get_cwd(void)
 {
 	char* cwd = 0;
 #if WINDOWS_VER
@@ -157,25 +166,27 @@ void make(void) {
 	char obj_path[PATH_MAX];
 	snprintf(obj_path, PATH_MAX, "%sobj/", config.d_build);
 
+	char outfiles[PATH_MAX];
 	char cmd[PATH_MAX] = {0};
 	cmd_ptrs ptrs = {.n = PATH_MAX, .file = 0, .obj_path = obj_path, .out = cmd};
 	for(int i = 0; i < source_files.length; i++) {
 		ptrs.file = source_files.array[i];
 
-		//TODO check modified times
-		struct stat st = {0};
-		if(stat(ptrs.file, &st) == 1) {
-		}
+		snprintf(outfiles, PATH_MAX, "%s%s", config.d_src, ptrs.file);
+		unsigned long msource = get_file_mtime(outfiles);
+		snprintf(outfiles, PATH_MAX, "%s%s.o", obj_path, ptrs.file);
+		unsigned long mobj = get_file_mtime(outfiles);
 
-		create_compile_command(&config, &ptrs);
-		printf("%s\n", cmd);
-		int r = system(cmd);
-		if (r) err(1, "File %s failed to compile!!\n", source_files.array[i]);
+		if (msource > mobj) {
+			create_compile_command(&config, &ptrs);
+			printf("%s\n", cmd);
+			int r = system(cmd);
+			if (r) err(1, "File %s failed to compile!!\n", source_files.array[i]);
+		}
 	}
 
 	str_stream* ss = str_stream_init();
 	str_array object_files = get_object_files(obj_path);
-	char outfiles[PATH_MAX];
 	for(int i = 0; i < object_files.length; i++) {
 		snprintf(outfiles, PATH_MAX, "%s%s", obj_path, object_files.array[i]);
 		str_stream_add(ss, outfiles);
@@ -261,7 +272,7 @@ void run_exe(struct Config* config) {
 }
 
 void get_compile_commands(struct Config* config) {
-	printf("Creating compile_commands.json");
+	printf("Creating compile_commands.json\n");
 	FILE* file = fopen("compile_commands.json", "w");
 	if (!file) {
 		err(1, "Unable to create compile_commands.json\n");
@@ -278,7 +289,7 @@ void get_compile_commands(struct Config* config) {
   \"output\": \"%s%s.o\"\n\
 }";
 
-	str_array source_files = get_source_files(config->d_src);
+	str_array source_files = get_files(config->d_src);
 	char cmd[1024];
 	char obj_path[PATH_MAX]; 
 	snprintf(obj_path, PATH_MAX, "%sobj/", config->d_build);
@@ -489,3 +500,11 @@ str_array get_object_files(const char* dir) {
 	return array;
 }
 
+unsigned long get_file_mtime(const char* filename) {
+	struct stat st = {0};
+	if (stat(filename, &st)) {
+		return 0;
+	}
+
+	return st.st_mtime;
+}

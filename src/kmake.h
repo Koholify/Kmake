@@ -1,6 +1,7 @@
 #ifndef _H_KMAKE
 #define _H_KMAKE
 
+#include <time.h>
 #include "strings.h"
 
 struct Config {
@@ -27,7 +28,10 @@ void install(struct Config* config);
 
 struct Config get_config(void);
 void free_config(struct Config config);
+const char* get_cwd(void);
+unsigned long get_file_mtime(const char* filename);
 
+str_array get_files(const char* dir);
 str_array get_source_files(const char* dir);
 str_array get_object_files(const char* dir);
 
