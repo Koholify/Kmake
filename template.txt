@@ -1,9 +1,0 @@
-CC=clang
-SRC=./src/
-BUILD=./.build/
-
-PROJECTNAME=app
-CFLAGS=-std=c17 -Werror -Wall -pedantic
-LFLAGS=
-INCLUDES=
-

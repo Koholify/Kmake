@@ -1,6 +1,18 @@
 [
 {
   "directory": "/",
+  "command": "clang -std=c17 -g -Werror -Wall -pedantic  -I./src/ -c ./src/. -o ./.build/obj/..o",
+  "file": ".",
+  "output": "./.build/obj/..o"
+},
+{
+  "directory": "/",
+  "command": "clang -std=c17 -g -Werror -Wall -pedantic  -I./src/ -c ./src/.. -o ./.build/obj/...o",
+  "file": "..",
+  "output": "./.build/obj/...o"
+},
+{
+  "directory": "/",
   "command": "clang -std=c17 -g -Werror -Wall -pedantic  -I./src/ -c ./src/args.c -o ./.build/obj/args.c.o",
   "file": "args.c",
   "output": "./.build/obj/args.c.o"

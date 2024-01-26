@@ -1,9 +1,7 @@
 #define _CRT_SECURE_NO_WARNINGS 1
 
-#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <err.h>
 #include "kmake.h"
 #include "strings.h"
 #include "args.h"
@@ -11,13 +9,15 @@
 #if defined(__WIN32__) || defined(WIN32) || defined(_WIN32) || defined(__NT__)
 #define WINDOWS_VER 1
 
-#include <windows.h>
+#include <Windows.h>
+#define PATH_MAX 4096
 
 #else
 
 #define POSIX_VER 1
 #define __USE_MISC 1
 #include <stdint.h>
+#include <err.h>
 #include <dirent.h>
 #include <sys/stat.h>
 #include <errno.h>
@@ -85,16 +85,18 @@ str_array get_files(const char* dir) {
 const char* get_cwd(void)
 {
 	char* cwd = 0;
-#if WINDOWS_VER
-#else
 	char path[PATH_MAX];
+#if WINDOWS_VER
+	GetCurrentDirectoryA(PATH_MAX, path);
+#else
 	getcwd(path, PATH_MAX);
+#endif
+
 	if (str_ends_with(path, "/") || str_ends_with(path, "\\")){
 		cwd = str_acopy(path);
 	} else {
 		cwd = str_cat(path, "/");
 	}
-#endif
 
 	return cwd;
 }
@@ -124,6 +126,16 @@ static void create_compile_command(struct Config* config, cmd_ptrs* ptrs) {
 	char outfile[PATH_MAX];
 	snprintf(outfile, PATH_MAX, "%s%s.o", ptrs->obj_path, ptrs->file);
 	snprintf(ptrs->out, ptrs->n, "%s %s %s -I%s -c %s%s -o %s", config->cc, config->cflags, config->includes, config->d_src, config->d_src, ptrs->file, outfile);
+}
+
+static int create_directory(const char* path) {
+	int result = 1;
+#if WINDOWS_VER
+	result = CreateDirectoryA(path, 0);
+#else
+	result = mkdir(path, 0777);
+#endif
+	return result;
 }
 
 void run_with_args(int argc, char** argv) {
@@ -181,7 +193,10 @@ void make(void) {
 			create_compile_command(&config, &ptrs);
 			printf("%s\n", cmd);
 			int r = system(cmd);
-			if (r) err(1, "File %s failed to compile!!\n", source_files.array[i]);
+			if (r) {
+				printf("File %s failed to compile!!\n", source_files.array[i]);
+				return;
+			}
 		}
 	}
 
@@ -200,7 +215,10 @@ void make(void) {
 	snprintf(cmd, PATH_MAX, "%s %s-o %s %s", config.cc, obj_files, target, config.lflags);
 	printf("%s\n", cmd);
 	int r = system(cmd);
-	if (r) err(1, "Executable failed to link!!\n");
+	if (r) {
+		printf("Executable failed to link!!\n");
+		return;
+	}
 
 	free((void*)target);
 	free((void*)obj_files);
@@ -216,12 +234,12 @@ void make(void) {
 
 void init_dir(void) {
 	printf("Adding source and build directories...\n");
-	if (mkdir("./src", 0777)) 
-		printf("Unable to make \"src/\" directory. errno: %d\n", errno);
-	if (mkdir("./.build", 0777)) 
-		printf("Unable to make \".build/\" directory. errno: %d\n", errno);
-	else if (mkdir("./.build/obj/", 0777))
-		printf("Unable to make \".build/obj\" directory. errno: %d\n", errno);
+	if (create_directory("./src"))
+		printf("Unable to make \"%s\" directory.\n", "./src");
+	if (create_directory("./.build")) 
+		printf("Unable to make \"%s\" directory.\n", "./.build");
+	else if (create_directory("./.build/obj"))
+		printf("Unable to make \"%s\" directory.\n", "./.build/obj");
 
 	const char* cwd = get_cwd();
 	printf("Creating config file:\nDIR=%s\n%s\n", cwd, makeTemplate);
@@ -248,7 +266,9 @@ void clean_dir(struct Config* config) {
 	printf("removing files...\n");
 	const char* target = get_target(config);
 
-	if (remove(target)) err(1, "Failed to remove %s\n", target);
+	if (remove(target)) {
+		printf("Failed to remove %s\n", target);
+	}
 	free((void*)target);
 	char path[PATH_MAX];
 	snprintf(path, PATH_MAX, "%sobj/", config->d_build);
@@ -257,7 +277,9 @@ void clean_dir(struct Config* config) {
 	char file[PATH_MAX];
 	for (int i = 0; i < objs.length; i++) {
 		snprintf(file, PATH_MAX, "%s%s", path, objs.array[i]);
-		if (remove(file)) err(1, "Failed to remove %s\n", file);
+		if (remove(file)) {
+			printf("Failed to remove %s\n", file);
+		}
 	}
 
 	str_array_free(&objs);
@@ -275,7 +297,7 @@ void get_compile_commands(struct Config* config) {
 	printf("Creating compile_commands.json\n");
 	FILE* file = fopen("compile_commands.json", "w");
 	if (!file) {
-		err(1, "Unable to create compile_commands.json\n");
+		printf("Unable to create compile_commands.json\n");
 		return;
 	}
 
@@ -427,6 +449,37 @@ static void FillConfig(struct Config* config, struct str_array* lines) {
 
 #if WINDOWS_VER
 static str_array get_files_windows(const char* dir_path) {
+	WIN32_FIND_DATAA data = {0};
+	char* dir = str_cat(dir_path, "*");
+
+	int filecount = 0;
+	HANDLE h = FindFirstFileA(dir, &data);
+
+	if (h != INVALID_HANDLE_VALUE) {
+		do {
+			filecount++;
+		} while( FindNextFileA(h, &data));
+	}
+
+	FindClose(h);
+
+
+	str_array array = {0};
+	array.length = filecount;
+	array.array = (char**)malloc(sizeof(void*) * array.length);
+
+	h = FindFirstFileA(dir, &data);
+	int i = 0;
+	if (h != INVALID_HANDLE_VALUE) {
+		do {
+			array.array[i++] = str_acopy(data.cFileName);
+		} while (FindNextFileA(h, &data));
+	}
+
+	FindClose(h);
+	free(dir);
+
+	return array;
 }
 #endif
 
@@ -501,10 +554,23 @@ str_array get_object_files(const char* dir) {
 }
 
 unsigned long get_file_mtime(const char* filename) {
+#if WINDOWS_VER
+	BY_HANDLE_FILE_INFORMATION info = {0};
+	HANDLE hf = CreateFileA(filename, GENERIC_READ, 0, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
+	GetFileInformationByHandle(hf, &info);
+	CloseHandle(hf);
+
+	ULARGE_INTEGER ul;
+	ul.LowPart = info.ftLastWriteTime.dwLowDateTime;
+	ul.HighPart = info.ftLastWriteTime.dwHighDateTime;
+
+	return ul.QuadPart;
+#else
 	struct stat st = {0};
 	if (stat(filename, &st)) {
 		return 0;
 	}
-
 	return st.st_mtime;
+#endif
+	return 0;
 }
