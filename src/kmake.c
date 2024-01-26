@@ -234,6 +234,7 @@ void make(void) {
 
 void init_dir(void) {
 	printf("Adding source and build directories...\n");
+	int create_source = 0;
 	if (create_directory("./src"))
 		printf("Unable to make \"%s\" directory.\n", "./src");
 	if (create_directory("./.build")) 
@@ -256,9 +257,11 @@ void init_dir(void) {
 	fputs(gitignoreTemplate, ignore);
 	fclose(ignore);
 
-	FILE* example = fopen("./src/main.c", "w");
-	fputs(helloworldTemplate, example);
-	fclose(example);
+	if (create_source) {
+		FILE* example = fopen("./src/main.c", "w");
+		fputs(helloworldTemplate, example);
+		fclose(example);
+	}
 }
 
 void clean_dir(struct Config* config) {
@@ -342,7 +345,13 @@ void get_compile_commands(struct Config* config) {
 void install(struct Config* config) {
 	char cmd[PATH_MAX];
 	const char* target = get_target(config);
+#if WINDOWS_VER
+	snprintf(cmd, PATH_MAX, "copy %s %s", target, config->d_install);
+	for(int i = 0; i < str_len(cmd); i++)
+		if (cmd[i] == '/') cmd[i] = '\\';
+#else
 	snprintf(cmd, PATH_MAX, "install -v %s %s", target, config->d_install);
+#endif
 
 	printf("%s\n", cmd);
 	system(cmd);

@@ -1,9 +1,12 @@
+DIR=C:\Users\kprice\SideProjects\testDir/
 CC=clang
 SRC=./src/
 BUILD=./.build/
 
 PROJECTNAME=kmake
-CFLAGS=-std=c17 -g -Werror -Wall -pedantic
+CFLAGS=-std=c17 -Werror -Wall -pedantic
 LFLAGS=
 INCLUDES=
 
+INSTALL_LOC=%HOMEPATH%/tools/bin
+COMPILE_COMMANDS=0

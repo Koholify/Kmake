@@ -1,54 +1,54 @@
 [
 {
-  "directory": "/",
+  "directory": "C:\Users\kprice\SideProjects\kmake/",
   "command": "clang -std=c17 -g -Werror -Wall -pedantic  -I./src/ -c ./src/. -o ./.build/obj/..o",
   "file": ".",
   "output": "./.build/obj/..o"
 },
 {
-  "directory": "/",
+  "directory": "C:\Users\kprice\SideProjects\kmake/",
   "command": "clang -std=c17 -g -Werror -Wall -pedantic  -I./src/ -c ./src/.. -o ./.build/obj/...o",
   "file": "..",
   "output": "./.build/obj/...o"
 },
 {
-  "directory": "/",
+  "directory": "C:\Users\kprice\SideProjects\kmake/",
   "command": "clang -std=c17 -g -Werror -Wall -pedantic  -I./src/ -c ./src/args.c -o ./.build/obj/args.c.o",
   "file": "args.c",
   "output": "./.build/obj/args.c.o"
 },
 {
-  "directory": "/",
+  "directory": "C:\Users\kprice\SideProjects\kmake/",
   "command": "clang -std=c17 -g -Werror -Wall -pedantic  -I./src/ -c ./src/args.h -o ./.build/obj/args.h.o",
   "file": "args.h",
   "output": "./.build/obj/args.h.o"
 },
 {
-  "directory": "/",
+  "directory": "C:\Users\kprice\SideProjects\kmake/",
   "command": "clang -std=c17 -g -Werror -Wall -pedantic  -I./src/ -c ./src/kmake.c -o ./.build/obj/kmake.c.o",
   "file": "kmake.c",
   "output": "./.build/obj/kmake.c.o"
 },
 {
-  "directory": "/",
+  "directory": "C:\Users\kprice\SideProjects\kmake/",
   "command": "clang -std=c17 -g -Werror -Wall -pedantic  -I./src/ -c ./src/kmake.h -o ./.build/obj/kmake.h.o",
   "file": "kmake.h",
   "output": "./.build/obj/kmake.h.o"
 },
 {
-  "directory": "/",
+  "directory": "C:\Users\kprice\SideProjects\kmake/",
   "command": "clang -std=c17 -g -Werror -Wall -pedantic  -I./src/ -c ./src/main.c -o ./.build/obj/main.c.o",
   "file": "main.c",
   "output": "./.build/obj/main.c.o"
 },
 {
-  "directory": "/",
+  "directory": "C:\Users\kprice\SideProjects\kmake/",
   "command": "clang -std=c17 -g -Werror -Wall -pedantic  -I./src/ -c ./src/strings.c -o ./.build/obj/strings.c.o",
   "file": "strings.c",
   "output": "./.build/obj/strings.c.o"
 },
 {
-  "directory": "/",
+  "directory": "C:\Users\kprice\SideProjects\kmake/",
   "command": "clang -std=c17 -g -Werror -Wall -pedantic  -I./src/ -c ./src/strings.h -o ./.build/obj/strings.h.o",
   "file": "strings.h",
   "output": "./.build/obj/strings.h.o"
