@@ -614,20 +614,26 @@ void compile_to_exe(struct Config* config, char* cmd, const char* target, const 
 }
 
 void compile_to_static(struct Config* config, char* cmd, const char* obj_files) {
-	int ar = system("ar --version > /dev/null");
-	int llvm_ar = ar == 0 ? 0 : system("llvm-ar --version > /dev/null");
+	const char* extension;
+	const char* nul;
+#if WINDOWS_VER
+	extension = ".lib";
+	nul = "> nul";
+#else 
+	extension = ".a";
+	nul = "? /dev/null";
+#endif
+	char check[256];
+	snprintf(check, 256, "%s %s", "ar --version", nul);
+	int ar = system(check);
+	snprintf(check, 256, "%s %s", "llvm-ar --version", nul);
+	int llvm_ar = ar == 0 ? 0 : system(check);
 	const char* ar_tool = ar == 0 ? "ar" : (llvm_ar == 0 ? "llvm-ar" : 0);
 	if (!ar_tool) {
 		puts("Archive tool not found. [ar/llvm-ar] are required on path to compile to static lib.");
 		return;
 	}
 
-	const char* extension;
-#if WINDOWS_VER
-	extension = ".lib";
-#else 
-	extension = ".a";
-#endif
 	snprintf(cmd, PATH_MAX, "%s r %slib%s%s %s", ar_tool, config->d_build, config->name, extension, obj_files);
 	printf("%s\n", cmd);
 	int r = system(cmd);
