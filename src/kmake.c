@@ -59,7 +59,7 @@ CFLAGS=-std=c17 -Werror -Wall -pedantic\n\
 LFLAGS=\n\
 INCLUDES=\n\
 \n\
-INSTALL_LOC=/usr/bin/\n\
+INSTALL_LOC=/usr/local/bin/\n\
 COMPILE_COMMANDS=0\n\
 ";
 
