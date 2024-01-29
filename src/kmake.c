@@ -131,7 +131,7 @@ static void create_compile_command(struct Config* config, cmd_ptrs* ptrs) {
 static int create_directory(const char* path) {
 	int result = 1;
 #if WINDOWS_VER
-	result = CreateDirectoryA(path, 0);
+	result = CreateDirectoryA(path, 0) ? 0 : 1;
 #else
 	result = mkdir(path, 0777);
 #endif
@@ -191,9 +191,9 @@ void make(void) {
 		ptrs.file = source_files.array[i];
 
 		snprintf(outfiles, PATH_MAX, "%s%s", config.d_src, ptrs.file);
-		unsigned long msource = get_file_mtime(outfiles);
+		unsigned long long msource = get_file_mtime(outfiles);
 		snprintf(outfiles, PATH_MAX, "%s%s.o", obj_path, ptrs.file);
-		unsigned long mobj = get_file_mtime(outfiles);
+		unsigned long long mobj = get_file_mtime(outfiles);
 
 		if (msource > mobj) {
 			create_compile_command(&config, &ptrs);
@@ -297,6 +297,15 @@ void clean_dir(struct Config* config) {
 void run_exe(struct Config* config) {
 	const char* target = get_target(config);
 
+#if WINDOWS_VER
+	char* winTarget = (char*)malloc(sizeof(char) * (str_len(target) + 1));
+	for(int i = 0; i < str_len(target) + 1; i++) {
+		winTarget[i] = target[i];
+		if (target[i] == '/') winTarget[i] = '\\';
+	}
+	free((void*)target);
+	target = winTarget;
+#endif
 	printf("%s\n", target);
 	system(target);
 	free((void*)target);
@@ -568,7 +577,7 @@ str_array get_object_files(const char* dir) {
 	return array;
 }
 
-unsigned long get_file_mtime(const char* filename) {
+unsigned long long get_file_mtime(const char* filename) {
 #if WINDOWS_VER
 	BY_HANDLE_FILE_INFORMATION info = {0};
 	HANDLE hf = CreateFileA(filename, GENERIC_READ, 0, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
@@ -585,7 +594,7 @@ unsigned long get_file_mtime(const char* filename) {
 	if (stat(filename, &st)) {
 		return 0;
 	}
-	return st.st_mtime;
+	return (unsigned long long)st.st_mtime;
 #endif
 	return 0;
 }
