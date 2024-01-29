@@ -15,6 +15,7 @@ struct Config {
 	const char * d_install;
 	const char * d_parent;
 	char compile_command;
+	const char * type;
 };
 
 void run_with_args(int argc, char** argv);
@@ -34,5 +35,9 @@ unsigned long long get_file_mtime(const char* filename);
 str_array get_files(const char* dir);
 str_array get_source_files(const char* dir);
 str_array get_object_files(const char* dir);
+
+void compile_to_exe(struct Config* config, char* cmd, const char* target, const char* obj_files);
+void compile_to_static(struct Config* config, char* cmd, const char* obj_files);
+void compile_to_shared();
 
 #endif // !_H_KMAKE

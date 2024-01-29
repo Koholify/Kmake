@@ -10,7 +10,7 @@
 #define WINDOWS_VER 1
 
 #include <Windows.h>
-#define PATH_MAX 4096
+#define MAX_PATH 4096
 
 #else
 
@@ -19,9 +19,9 @@
 #include <stdint.h>
 #include <err.h>
 #include <dirent.h>
+#include <limits.h>
 #include <sys/stat.h>
 #include <errno.h>
-#include <limits.h>
 #include <unistd.h>
 
 #ifdef __linux__
@@ -54,6 +54,7 @@ SRC=./src/\n\
 BUILD=./.build/\n\
 \n\
 PROJECTNAME=app\n\
+TYPE=exe\n\
 CFLAGS=-std=c17 -Werror -Wall -pedantic\n\
 LFLAGS=\n\
 INCLUDES=\n\
@@ -218,12 +219,12 @@ void make(void) {
 	str_stream_free(ss);
 
 	const char* target = get_target(&config);
-	snprintf(cmd, PATH_MAX, "%s %s-o %s %s", config.cc, obj_files, target, config.lflags);
-	printf("%s\n", cmd);
-	int r = system(cmd);
-	if (r) {
-		printf("Executable failed to link!!\n");
-		return;
+	if (str_eql(config.type, "static")) {
+		compile_to_static(&config, cmd, obj_files);
+	} else if (str_eql(config.type, "shared")) {
+		compile_to_shared();
+	} else {
+		compile_to_exe(&config, cmd, target, obj_files);
 	}
 
 	free((void*)target);
@@ -412,6 +413,7 @@ void free_config(struct Config config) {
 	free((void*)config.includes);
 	free((void*)config.d_install);
 	free((void*)config.d_parent);
+	free((void*)config.type);
 }
 
 static void FillConfig(struct Config* config, struct str_array* lines) {
@@ -441,6 +443,8 @@ static void FillConfig(struct Config* config, struct str_array* lines) {
 				config->d_parent = str_acopy(split.array[1]);
 			if (str_eql(split.array[0], "COMPILE_COMMANDS"))
 				config->compile_command = str_eql(split.array[1], "1");
+			if (str_eql(split.array[0], "TYPE"))
+				config->type = str_acopy(split.array[1]);
 		}
 
 		if (!(str_ends_with(config->d_build, "/") || str_ends_with(config->d_build, "\\"))) {
@@ -597,4 +601,42 @@ unsigned long long get_file_mtime(const char* filename) {
 	return (unsigned long long)st.st_mtime;
 #endif
 	return 0;
+}
+
+void compile_to_exe(struct Config* config, char* cmd, const char* target, const char* obj_files) {
+	snprintf(cmd, PATH_MAX, "%s %s-o %s %s", config->cc, obj_files, target, config->lflags);
+	printf("%s\n", cmd);
+	int r = system(cmd);
+	if (r) {
+		printf("Executable failed to link!!\n");
+		return;
+	}
+}
+
+void compile_to_static(struct Config* config, char* cmd, const char* obj_files) {
+	int ar = system("ar --version > /dev/null");
+	int llvm_ar = ar == 0 ? 0 : system("llvm-ar --version > /dev/null");
+	const char* ar_tool = ar == 0 ? "ar" : (llvm_ar == 0 ? "llvm-ar" : 0);
+	if (!ar_tool) {
+		puts("Archive tool not found. [ar/llvm-ar] are required on path to compile to static lib.");
+		return;
+	}
+
+	const char* extension;
+#if WINDOWS_VER
+	extension = ".lib";
+#else 
+	extension = ".a";
+#endif
+	snprintf(cmd, PATH_MAX, "%s r %slib%s%s %s", ar_tool, config->d_build, config->name, extension, obj_files);
+	printf("%s\n", cmd);
+	int r = system(cmd);
+	if (r) {
+		printf("library failed to link!!\n");
+		return;
+	}
+}
+void compile_to_shared() {
+	//TODO
+	printf("Compiling to shared library not supported\n");
 }
