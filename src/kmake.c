@@ -175,6 +175,12 @@ void make(void) {
 	}
 
 	str_array source_files = get_source_files(config.d_src);
+
+	if (source_files.length < 1) {
+		puts("No Source Files Found");
+		abort();
+	}
+
 	char obj_path[PATH_MAX];
 	snprintf(obj_path, PATH_MAX, "%sobj/", config.d_build);
 
@@ -257,7 +263,7 @@ void init_dir(void) {
 	fputs(gitignoreTemplate, ignore);
 	fclose(ignore);
 
-	if (create_source) {
+	if (!create_source) {
 		FILE* example = fopen("./src/main.c", "w");
 		fputs(helloworldTemplate, example);
 		fclose(example);
