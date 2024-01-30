@@ -38,6 +38,6 @@ str_array get_object_files(const char* dir);
 
 void compile_to_exe(struct Config* config, char* cmd, const char* target, const char* obj_files);
 void compile_to_static(struct Config* config, char* cmd, const char* obj_files);
-void compile_to_shared();
+void compile_to_shared(void);
 
 #endif // !_H_KMAKE

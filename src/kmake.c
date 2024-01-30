@@ -9,8 +9,8 @@
 #if defined(__WIN32__) || defined(WIN32) || defined(_WIN32) || defined(__NT__)
 #define WINDOWS_VER 1
 
+#define PATH_MAX 4096
 #include <Windows.h>
-#define MAX_PATH 4096
 
 #else
 
@@ -93,6 +93,9 @@ const char* get_cwd(void)
 	getcwd(path, PATH_MAX);
 #endif
 
+	for (int i = 0; path[i] && i < PATH_MAX; i++) {
+		if (path[i] == '\\') path[i] = '/';
+	}
 	if (str_ends_with(path, "/") || str_ends_with(path, "\\")){
 		cwd = str_acopy(path);
 	} else {
@@ -326,8 +329,7 @@ void get_compile_commands(struct Config* config) {
 {\n\
   \"directory\": \"%s\",\n\
   \"command\": \"%s\",\n\
-  \"file\": \"%s\",\n\
-  \"output\": \"%s%s.o\"\n\
+  \"file\": \"%s%s\"\n\
 }";
 
 	str_array source_files = get_files(config->d_src);
@@ -342,7 +344,7 @@ void get_compile_commands(struct Config* config) {
 		create_compile_command(config, &ptrs);
 	
 		char filledTemplate[4096];
-		snprintf(filledTemplate, 4096, commandTemplate, config->d_parent, cmd, source_files.array[i], obj_path, source_files.array[i]);
+		snprintf(filledTemplate, 4096, commandTemplate, config->d_parent, cmd, config->d_src, source_files.array[i]);
 		fputs(filledTemplate, file);
 
 		if (i == source_files.length  - 1) {
@@ -642,7 +644,7 @@ void compile_to_static(struct Config* config, char* cmd, const char* obj_files) 
 		return;
 	}
 }
-void compile_to_shared() {
+void compile_to_shared(void) {
 	//TODO
 	printf("Compiling to shared library not supported\n");
 }
