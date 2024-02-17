@@ -35,7 +35,7 @@ clean:
 dirW:
 	mkdir $(builddir)\$(objdir)
 dir:
-	mkdir $(builddir)/$(objdir)
+	mkdir -p $(builddir)/$(objdir)
 
 $(builddir)/$(objdir)/%.c.o: $(srcdir)/%.c Makefile $(headerfiles)
 	$(CC) $(CFlags) -c $< -o $@
